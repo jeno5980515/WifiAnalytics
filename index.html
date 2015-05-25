@@ -14,6 +14,8 @@ var resultList = [] ;
 var ssidAndMacList = {} ;
 var lockCount = 0 ;
 var unlockCount = 0 ;
+var invisibleCount = 0 ;
+var visibleCount = 0 ;
 
 $.get('http://ncuwifi.byethost12.com/get.php' , function(response) {
 	data = jQuery.parseJSON(response) ;
@@ -55,6 +57,7 @@ $.get('http://ncuwifi.byethost12.com/get.php' , function(response) {
 	drawMacs();
 	drawLockRate();
 	drawSingleMac();
+	drawVisible() ;
 });
 
 
@@ -158,7 +161,8 @@ function resetAll(){
 <div><button onclick="resetAll()">Reset</button></div><p>
 <canvas id="lockRate" width="400" height="400"></canvas>
 <canvas id="ssidAndMac" width="400" height="400"></canvas>
-<canvas id="singleMac" width="400" height="400"></canvas>
+<canvas id="singleMac" width="400" height="400"></canvas><p>
+<canvas id="visible" width="400" height="400"></canvas>
 <script>
 
 function drawLockRate(){
@@ -188,13 +192,14 @@ function drawMacs(){
 	var ssidAndMacData = [];
 	var otherCount = 0 ;
 	for ( var element in ssidAndMacList ){
-		// empty
 		if ( ssidAndMacList[element][0].Security === "[ESS]" )
 			unlockCount ++ ;
 		else 
 			lockCount ++ ;
-		if ( ssidAndMacList[element][0].ssid == "" )
+		// empty
+		if ( ssidAndMacList[element][0].ssid == "" ){
 			continue ;
+		}
 		if ( ssidAndMacList[element].length > 10 ){
 			data = {
 				label: ssidAndMacList[element][0].ssid ,
@@ -211,6 +216,7 @@ function drawMacs(){
 				nonsingleMac ++ ;
 			otherCount ++ ;
 		}
+		visibleCount ++ ;
 	}
 	data = {
 		label: "other",
@@ -241,5 +247,25 @@ function drawSingleMac(){
 	];
 	var ctx = document.getElementById("singleMac").getContext("2d");
 	var singleMacPie = new Chart(ctx).Pie(singleMacData);
+}
+
+function drawVisible(){
+	invisibleCount = ssidAndMacList[""].length ;
+	var visibleData = [
+		{
+			value: invisibleCount,
+			color:"#F7464A",
+			highlight: "#FF5A5E",
+			label: "invisible"
+		},
+		{
+			value: visibleCount,
+			color: "#46BFBD",
+			highlight: "#5AD3D1",
+			label: "visible"
+		}
+	];
+	var ctx = document.getElementById("visible").getContext("2d");
+	var visiblePie = new Chart(ctx).Pie(visibleData);
 }
 </script>
