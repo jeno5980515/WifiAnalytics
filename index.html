@@ -1,0 +1,245 @@
+<meta charset="UTF-8">
+<script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script src="https://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+<script type="text/javascript" src="https://maps.google.com/maps/api/js?sensor=false"></script>
+<script type="text/javascript" src="js/Chart.js"></script>
+<style type="text/css">
+#user_gmap{ width:100%;height:99%; margin:20px20px 0px; border:solid 1px #111; }
+</style>
+
+<script type="text/javascript">
+
+var list = {} ;
+var resultList = [] ;
+var ssidAndMacList = {} ;
+var lockCount = 0 ;
+var unlockCount = 0 ;
+
+$.get('http://ncuwifi.byethost12.com/get.php' , function(response) {
+	data = jQuery.parseJSON(response) ;
+	for ( var i = 0 ; i < data.length ; i ++ ){
+		var mac = data[i].MAC ;
+		if ( list[mac] === undefined ){
+			list[mac] = [] ;
+		}
+		list[mac].push(data[i]) ;
+	}
+	var c = 0 ;
+	for ( var mac in list ){
+		var averageLatitude = 0 , averageLongitude = 0 , averageLevel = 0 , length = list[mac].length ;
+		for ( var i = 0 ; i < length ; i ++ ){
+			averageLatitude += parseFloat(list[mac][i].latitude) ;
+			averageLongitude += parseFloat(list[mac][i].longitude) ;
+			averageLevel += parseFloat(list[mac][i].RSSI) ; 
+		}
+		averageLatitude /= length ;
+		averageLongitude /= length ;
+		averageLevel /= length ;
+		resultList.push({
+			level: averageLevel ,
+			ssid: list[mac][0].SSID ,
+			mac: list[mac][0].MAC ,
+			latitude: averageLatitude ,
+			longitude: averageLongitude ,
+			Security: list[mac][0].Security 
+		}) ;
+	}
+	length = resultList.length ;
+	for ( var i = 0 ; i < length ; i ++ ){
+		var ssid = resultList[i].ssid ; 
+		if ( ssidAndMacList[ssid] === undefined )
+			ssidAndMacList[ssid] = [] ;
+		ssidAndMacList[ssid].push(resultList[i]) ;
+	}
+	setMarker();
+	drawMacs();
+	drawLockRate();
+	drawSingleMac();
+});
+
+
+var map ;
+
+google.maps.event.addDomListener(window, 'load', function() {
+	var mapdiv = document.getElementById('user_gmap');
+	var myOptions = {
+		zoom: 17,
+		center: new google.maps.LatLng(24.9682458,121.192001),
+		mapTypeId: google.maps.MapTypeId.ROADMAP,
+	};
+	map = new google.maps.Map(mapdiv, myOptions);
+});
+
+var markList = [] ;
+var infoList = [] ;
+
+var setMarker = function(){
+	var length = resultList.length ;
+	for ( var i = 0 ; i < length ; i ++ ){
+		var marker = new google.maps.Marker({
+			position: new google.maps.LatLng(resultList[i].latitude,resultList[i].longitude),
+			map: map, 
+			title: resultList[i].ssid, 
+			mac: resultList[i].mac
+		});
+		var content = 'SSID : ' + resultList[i].ssid + '</br>MAC : ' + resultList[i].mac + '</br>Level : ' + resultList[i].level 
+					 + '</br>Latitude : ' + resultList[i].latitude + '</br>Longitude : ' + resultList[i].longitude ;
+		attachSecretMessage(marker,content) ;
+		//
+		markList.push(marker) ;
+	}
+}
+
+function attachSecretMessage(marker, content) {
+	var infowindow = new google.maps.InfoWindow({
+		content: content ,
+		size: new google.maps.Size(200, 200)
+	});
+	google.maps.event.addListener(marker, 'click', function() {
+		infowindow.open(marker.get('map'), marker);
+		showDetail(marker.mac) ;
+	});
+}
+
+var circleList = [] ;
+
+function showDetail(mac){
+	var phonemap = [];
+	var length = list[mac].length ;
+	for ( var i = 0 ; i < length ; i ++ ){
+		phonemap.push(list[mac][i]) ;
+	}
+	for ( var i = 0 ; i < length ; i ++ ){
+		var circleData = {
+		  strokeColor: '#FF0000',
+		  strokeOpacity: 0.8,
+		  strokeWeight: 1.5,
+		  fillColor: '#FF0000',
+		  fillOpacity: 0.2,
+		  map: map,
+		  center: new google.maps.LatLng(phonemap[i].latitude, phonemap[i].longitude),
+		  radius: circleRadius(parseFloat(phonemap[i].RSSI) * (-1)) 
+		};
+		circle = new google.maps.Circle(circleData);
+		circleList.push(circle) ;
+	}
+	removeAll(mac) ;
+}
+
+
+function circleRadius(data){
+	return data / 10 ;
+}
+
+function removeAll(mac){
+	var length = markList.length ;
+	for ( var i = 0 ; i < length ; i ++ ){
+		if ( markList[i].mac != mac )
+			markList[i].setMap(null);
+	}
+}
+
+function resetAll(){
+	var markLength = markList.length ;
+	for ( var i = 0 ; i < markLength ; i ++ ){
+		markList[i].setMap(map);
+	}
+	var circleLength = circleList.length ;
+	for ( var i = 0 ; i < circleLength ; i ++ ){
+		circleList[i].setMap(null);
+	}
+	circleList = [] ;
+}
+
+
+
+</script>
+<div id="user_gmap"></div><p>
+<div><button onclick="resetAll()">Reset</button></div><p>
+<canvas id="lockRate" width="400" height="400"></canvas>
+<canvas id="ssidAndMac" width="400" height="400"></canvas>
+<canvas id="singleMac" width="400" height="400"></canvas>
+<script>
+
+function drawLockRate(){
+	var lockRateData = [
+		{
+			value: lockCount,
+			color:"#F7464A",
+			highlight: "#FF5A5E",
+			label: "lock"
+		},
+		{
+			value: unlockCount,
+			color: "#46BFBD",
+			highlight: "#5AD3D1",
+			label: "unlock"
+		}
+	];
+	var ctx = document.getElementById("lockRate").getContext("2d");
+	var lockRatePie = new Chart(ctx).Pie(lockRateData);
+}
+
+var singleMac = 0 ;
+var nonsingleMac = 0 ;
+
+function drawMacs(){
+	//ssidAndMacList.sort();
+	var ssidAndMacData = [];
+	var otherCount = 0 ;
+	for ( var element in ssidAndMacList ){
+		// empty
+		if ( ssidAndMacList[element][0].Security === "[ESS]" )
+			unlockCount ++ ;
+		else 
+			lockCount ++ ;
+		if ( ssidAndMacList[element][0].ssid == "" )
+			continue ;
+		if ( ssidAndMacList[element].length > 10 ){
+			data = {
+				label: ssidAndMacList[element][0].ssid ,
+				value: ssidAndMacList[element].length ,
+				color:"#F7464A",
+				highlight: "#FF5A5E"
+			}
+			ssidAndMacData.push(data) ;
+			nonsingleMac ++ ;
+		} else {
+			if ( ssidAndMacList[element].length == 1 )
+				singleMac ++ ;
+			else 
+				nonsingleMac ++ ;
+			otherCount ++ ;
+		}
+	}
+	data = {
+		label: "other",
+		value: otherCount ,
+		color: "#46BFBD",
+		highlight: "#5AD3D1"
+	}
+	ssidAndMacData.push(data) ;
+	var ctx = document.getElementById("ssidAndMac").getContext("2d");
+	var ssidAndMacPie = new Chart(ctx).Pie(ssidAndMacData);
+
+}
+
+function drawSingleMac(){
+	var singleMacData = [
+		{
+			value: singleMac,
+			color:"#F7464A",
+			highlight: "#FF5A5E",
+			label: "single"
+		},
+		{
+			value: nonsingleMac,
+			color: "#46BFBD",
+			highlight: "#5AD3D1",
+			label: "nonsingle"
+		}
+	];
+	var ctx = document.getElementById("singleMac").getContext("2d");
+	var singleMacPie = new Chart(ctx).Pie(singleMacData);
+}
+</script>

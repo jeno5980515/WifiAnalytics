@@ -1,0 +1,123 @@
+<canvas id="myCanvas" width="1000%" height="500%" style="border:1px solid #c3c3c3;">
+Your browser does not support the canvas element.
+</canvas>
+<script src="http://code.jquery.com/jquery-1.11.2.min.js"></script>
+<script src="http://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+<script type="text/javascript" src="jquery.mousewheel.js"></script>
+<script type="text/javascript" src="jquery.mousewheel.min.js"></script>
+<script type="text/javascript" src="jcanvas.min.js"></script>
+<meta charset="UTF-8">
+<div>
+<select id = "select_name" ></select>
+</div>
+<script>
+		var dragspeed = 0.01 ;
+		var mouse_press = false ;
+		var press_mouse_x ;
+		var press_mouse_y ;
+		var move_x = 0 ;
+		var move_y = 0 ;
+		var moved_x = 0 ;
+		var moved_y = 0 ;
+		var mouse_x = 0, mouse_y = 0;
+		var c=document.getElementById("myCanvas");
+		var cxt=c.getContext("2d");
+		var data ;
+		var list = {} ;
+		var colorlist = {} ;
+		var namelist = {} ;
+		var baselong = 0 , baselati = 0 , disratio = 1 , levelratio = 0.1 ;
+		
+		document.getElementById('select_name').options.add(new Option('All' , 'All')) ;
+	$.get('http://jnshao.byethost22.com/get.php' , function(response) {
+		data = jQuery.parseJSON(response) ;
+		for ( var i = 0 ; i < data.length ; i ++ ){
+			var mac = data[i].MAC ;
+			if ( list[mac] === undefined )
+				list[mac] = [] ;
+			list[mac].push(data[i]) ;
+		}
+		for ( var key in list){
+			colorlist[key] = '#'+(Math.random()*0xffffff<<0).toString(16) ;
+			namelist[key] = list[key][0].SSID ;
+		}
+		for ( var key in namelist) {
+			document.getElementById('select_name').options.add(new Option(namelist[key] + '　　　　　　　' + key, key)) ;
+		}
+		Paint();
+	});
+	
+	
+	var Paint = function(){
+		var key = $('#select_name').val() ;
+		cxt.clearRect ( (-1)*c.width , (-1)*c.height , c.width*2, c.height*2 );
+		if ( key === 'All' ){
+			for ( var key in list ){
+				cxt.fillStyle= colorlist[key];
+				for ( var i = 0 ; i < list[key].length ; i ++ ){
+					cxt.beginPath();
+					cxt.arc((parseFloat(list[key][i].longitude)-baselong)*disratio+(move_x+moved_x),(parseFloat(list[key][i].latitude)-baselati)*disratio+(move_y+moved_y),(parseFloat(list[key][i].RSSI))*(-1)*levelratio,0,Math.PI*2,true);
+					cxt.closePath();
+					cxt.fill();
+				}
+			}
+		} else {
+			cxt.fillStyle= colorlist[key];
+			for ( var i = 0 ; i < list[key].length ; i ++ ){
+				cxt.beginPath();
+				cxt.arc((parseFloat(list[key][i].longitude)-baselong)*disratio+(move_x+moved_x),(parseFloat(list[key][i].latitude)-baselati)*disratio+(move_y+moved_y),(parseFloat(list[key][i].RSSI))*(-1)*levelratio,0,Math.PI*2,true);
+				cxt.closePath();
+				cxt.fill();
+			}
+		}
+	} 
+	$('#select_name').change(function(){
+		Paint();
+	});
+	
+	$("#myCanvas").mousedown(function (e) {
+		press_mouse_x = mouse_x;
+		press_mouse_y = mouse_y;
+		mouse_press = true ;
+	});
+	
+	$("#myCanvas").mouseup(function (e) {
+		moved_x += move_x ;
+		moved_y += move_y ;
+		move_x = 0 ;
+		move_y = 0 ;
+		mouse_press = false ;
+	});
+
+	$("#myCanvas").mousemove(function (e) {
+		mouse_x = e.pageX + document.documentElement.scrollTop;
+		mouse_y = e.pageY + document.documentElement.scrollLeft;
+		if ( mouse_press === true ){
+			move_x = mouse_x-press_mouse_x ;
+			move_y = mouse_y-press_mouse_y ;
+			Paint();
+		}
+	});
+	$(function(){
+		var count = 0;
+		$("#myCanvas").mousewheel(function(event, delta){
+
+
+			cxt.clearRect ( (-1)*c.width , (-1)*c.height , c.width*2, c.height*2 );
+			Paint();
+			var scaleratio = 0.1 ;
+			if ( delta > 0)
+				cxt.translate((-1)*mouse_x*scaleratio, (-1)*mouse_y*scaleratio);
+			else if ( delta < 0 )
+				cxt.translate(mouse_x*scaleratio, mouse_y*scaleratio);
+
+			cxt.scale(1+(delta*scaleratio),1+(delta*scaleratio));
+ 
+			return false;
+		}).html(count);
+	});
+
+</script>
+
+
+
